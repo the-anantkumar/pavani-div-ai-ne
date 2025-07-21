@@ -19,10 +19,9 @@ from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from immanuel import charts
-from immanuel.const import chart
+from immanuel.const import chart, calc
 from immanuel.setup import settings
 
-from utils.chart_to_text import chart_to_summary
 
 
 class AstroPersonalityBot:
@@ -56,11 +55,11 @@ class AstroPersonalityBot:
             chart.IC,
         ]
         settings.aspects = [
-            chart.CONJUNCTION,
-            chart.OPPOSITION,
-            chart.SQUARE,
-            chart.TRINE,
-            chart.SEXTILE,
+            calc.CONJUNCTION,
+            calc.OPPOSITION,
+            calc.SQUARE,
+            calc.TRINE,
+            calc.SEXTILE,
         ]
         settings.default_orb = 8.0
 
