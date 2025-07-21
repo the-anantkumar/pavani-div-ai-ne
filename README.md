@@ -40,3 +40,5 @@ This repository contains a minimal astrological chatbot that generates a random 
 ## License
 
 This project is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+Hugging 

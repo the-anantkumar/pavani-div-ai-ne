@@ -249,6 +249,7 @@ class AstroPersonalityBot:
         birth_data = self.generate_random_birth_data()
         self.current_chart_json = self.generate_chart_json(birth_data)
         chart_data = json.loads(self.current_chart_json)
+        print(chart_data)
         interpretation = self.interpret_chart_to_personality(self.current_chart_json)
         self.current_personality = {
             "interpretation": interpretation,
@@ -399,9 +400,9 @@ if BaseModel and app:
         response = bot.chat(request.message)
         return {"response": response, "session_id": request.session_id}
 
-
 if __name__ == "__main__":
     bot = AstroPersonalityBot()
+    print(f"setup bot...done!")
     interface = bot.create_gradio_interface()
     interface.launch(share=False, server_name="0.0.0.0", server_port=7860)
     # For FastAPI alternative, uncomment the following line:
