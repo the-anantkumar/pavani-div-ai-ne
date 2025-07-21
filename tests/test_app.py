@@ -1,6 +1,9 @@
 import json
 import os
 import sys
+from pathlib import Path
+
+import pandas as pd
 import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -16,6 +19,12 @@ def test_generate_random_birth_data(bot):
     b = bot()
     data = b.generate_random_birth_data()
     assert {"date", "time", "lat", "lon", "city", "country"}.issubset(data.keys())
+
+    df = pd.read_csv(Path(__file__).resolve().parents[1] / "data" / "locations.csv")
+    row = df[(df["city"] == data["city"]) & (df["country"] == data["country"])]
+    assert not row.empty
+    assert float(row.iloc[0]["latitude"]) == pytest.approx(data["lat"])
+    assert float(row.iloc[0]["longitude"]) == pytest.approx(data["lon"])
 
 
 def test_generate_chart_json_structure(bot):

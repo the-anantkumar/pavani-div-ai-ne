@@ -10,17 +10,37 @@ from __future__ import annotations
 import json
 import random
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import gradio as gr
-import torch
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+import pandas as pd
 
-from immanuel import charts
-from immanuel.const import chart, calc
-from immanuel.setup import settings
+try:  # Optional imports for test environments
+    import gradio as gr
+except Exception:  # pragma: no cover - optional dependency
+    gr = None
+try:
+    import torch
+except Exception:  # pragma: no cover - optional dependency
+    torch = None
+try:
+    from fastapi import FastAPI, HTTPException
+    from pydantic import BaseModel
+except Exception:  # pragma: no cover - optional dependency
+    FastAPI = HTTPException = BaseModel = None
+try:
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+except Exception:  # pragma: no cover - optional dependency
+    AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = None
+try:
+    from immanuel import charts
+    from immanuel.const import chart, calc
+    from immanuel.setup import settings
+except Exception:  # pragma: no cover - optional dependency
+    charts = chart = calc = settings = None
+
+# Load available locations once for generating real birth places
+LOCATIONS_DF = pd.read_csv(Path(__file__).resolve().parent / "data" / "locations.csv")
 
 
 
@@ -30,13 +50,20 @@ class AstroPersonalityBot:
     def __init__(self, model_name: str = "mistralai/Mistral-7B-Instruct-v0.1"):
         self._setup_immanuel()
         self.model_name = model_name
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self._setup_llm()
+        self.device = "cuda" if torch and hasattr(torch, "cuda") and torch.cuda.is_available() else "cpu"
+        try:
+            self._setup_llm()
+        except Exception as exc:  # pragma: no cover - optional during tests
+            print(f"LLM setup skipped: {exc}")
+            self.tokenizer = None
+            self.model = None
         self.current_chart_json: Optional[str] = None
         self.current_personality: Optional[Dict[str, Any]] = None
         self.chat_history: List[Tuple[str, str]] = []
 
     def _setup_immanuel(self) -> None:
+        if not settings:
+            return
         settings.house_system = chart.PLACIDUS
         settings.objects = [
             chart.SUN,
@@ -64,6 +91,10 @@ class AstroPersonalityBot:
         settings.default_orb = 8.0
 
     def _setup_llm(self) -> None:
+        if AutoTokenizer is None or AutoModelForCausalLM is None:
+            raise ImportError("transformers not available")
+        if torch is None:
+            raise ImportError("torch not available")
         print(f"Loading {self.model_name}...")
         if self.device == "cuda":
             bnb_config = BitsAndBytesConfig(
@@ -90,19 +121,22 @@ class AstroPersonalityBot:
         end_date = datetime(2005, 12, 31)
         random_days = random.randint(0, (end_date - start_date).days)
         birth_date = start_date + timedelta(days=random_days)
-        birth_datetime = datetime.combine(
-            birth_date.date(),
-            datetime.min.time(),
-        ) + timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59))
-        lat = random.uniform(-90, 90)
-        lon = random.uniform(-180, 180)
+        birth_datetime = (
+            datetime.combine(birth_date.date(), datetime.min.time())
+            + timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59))
+        )
+
+        location = LOCATIONS_DF.sample(1).iloc[0]
+        lat = float(location["latitude"])
+        lon = float(location["longitude"])
+
         return {
             "date": birth_datetime.strftime("%Y-%m-%d"),
             "time": birth_datetime.strftime("%H:%M"),
-            "lat": round(lat, 4),
-            "lon": round(lon, 4),
-            "city": "Random City",
-            "country": "Random Country",
+            "lat": lat,
+            "lon": lon,
+            "city": location["city"],
+            "country": location["country"],
         }
 
     def generate_chart_json(self, birth_data: Dict[str, Any]) -> str:
@@ -293,51 +327,55 @@ class AstroPersonalityBot:
         return interface
 
 
-app = FastAPI(title="Astrological Personality API")
+if FastAPI:
+    app = FastAPI(title="Astrological Personality API")
+else:  # pragma: no cover - FastAPI optional for tests
+    app = None
 bot: Optional[AstroPersonalityBot] = None
 
 
-class ChatRequest(BaseModel):
-    message: str
-    session_id: Optional[str] = None
+if BaseModel and app:
+    class ChatRequest(BaseModel):
+        message: str
+        session_id: Optional[str] = None
 
 
-class PersonalityRequest(BaseModel):
-    birth_data: Optional[Dict[str, Any]] = None
+    class PersonalityRequest(BaseModel):
+        birth_data: Optional[Dict[str, Any]] = None
 
 
-@app.on_event("startup")
-async def startup_event():
-    global bot
-    bot = AstroPersonalityBot()
+    @app.on_event("startup")
+    async def startup_event():
+        global bot
+        bot = AstroPersonalityBot()
 
 
-@app.post("/api/generate_personality")
-async def generate_personality(request: PersonalityRequest):
-    if request.birth_data:
-        chart_json = bot.generate_chart_json(request.birth_data)
-    else:
-        birth_data = bot.generate_random_birth_data()
-        chart_json = bot.generate_chart_json(birth_data)
-    interpretation = bot.interpret_chart_to_personality(chart_json)
-    bot.current_personality = {
-        "interpretation": interpretation,
-        "system_prompt": bot.create_system_prompt(interpretation),
-        "chart_json": chart_json,
-    }
-    return {
-        "success": True,
-        "chart": json.loads(chart_json),
-        "interpretation": interpretation,
-    }
+    @app.post("/api/generate_personality")
+    async def generate_personality(request: PersonalityRequest):
+        if request.birth_data:
+            chart_json = bot.generate_chart_json(request.birth_data)
+        else:
+            birth_data = bot.generate_random_birth_data()
+            chart_json = bot.generate_chart_json(birth_data)
+        interpretation = bot.interpret_chart_to_personality(chart_json)
+        bot.current_personality = {
+            "interpretation": interpretation,
+            "system_prompt": bot.create_system_prompt(interpretation),
+            "chart_json": chart_json,
+        }
+        return {
+            "success": True,
+            "chart": json.loads(chart_json),
+            "interpretation": interpretation,
+        }
 
 
-@app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
-    if not bot.current_personality:
-        raise HTTPException(status_code=400, detail="No personality generated yet")
-    response = bot.chat(request.message)
-    return {"response": response, "session_id": request.session_id}
+    @app.post("/api/chat")
+    async def chat_endpoint(request: ChatRequest):
+        if not bot.current_personality:
+            raise HTTPException(status_code=400, detail="No personality generated yet")
+        response = bot.chat(request.message)
+        return {"response": response, "session_id": request.session_id}
 
 
 if __name__ == "__main__":
