@@ -140,7 +140,17 @@ class AstroPersonalityBot:
         }
 
     def generate_chart_json(self, birth_data: Dict[str, Any]) -> str:
-        natal = charts.Natal(birth_data)
+        """Convert ``birth_data`` into an ``immanuel`` ``Subject`` and return
+        a JSON representation of the generated natal chart."""
+
+        subject = charts.Subject(
+            date_time=f"{birth_data['date']} {birth_data['time']}",
+            latitude=birth_data['lat'],
+            longitude=birth_data['lon'],
+            timezone="UTC",
+        )
+        natal = charts.Natal(subject)
+
         chart_dict: Dict[str, Any] = {
             "birth_data": birth_data,
             "planets": {},
@@ -148,34 +158,38 @@ class AstroPersonalityBot:
             "aspects": [],
             "angles": {},
         }
-        for obj_name, obj_data in natal.objects.items():
-            if hasattr(obj_data, "sign"):
-                chart_dict["planets"][obj_name] = {
-                    "sign": obj_data.sign.name,
-                    "degree": float(obj_data.lon),
-                    "house": obj_data.house.number if hasattr(obj_data, "house") and obj_data.house else None,
-                    "retrograde": getattr(obj_data, "retrograde", False),
+
+        for obj in natal.objects.values():
+            if obj.name in {"Asc", "MC", "Desc", "IC"}:
+                chart_dict["angles"][obj.name] = {
+                    "sign": obj.sign.name,
+                    "degree": float(obj.longitude.raw),
                 }
-        for house_num, house_data in natal.houses.items():
-            chart_dict["houses"][f"House_{house_num}"] = {
-                "sign": house_data.sign.name,
-                "degree": float(house_data.lon),
-            }
-        for angle_name, angle_data in natal.angles.items():
-            chart_dict["angles"][angle_name] = {
-                "sign": angle_data.sign.name,
-                "degree": float(angle_data.lon),
-            }
-        for aspect in natal.aspects:
-            chart_dict["aspects"].append(
-                {
-                    "planet1": aspect.objects[0].name,
-                    "planet2": aspect.objects[1].name,
-                    "type": aspect.type.name,
-                    "angle": float(aspect.angle),
-                    "orb": float(aspect.orb),
+            elif obj.type == "Planet":
+                chart_dict["planets"][obj.name] = {
+                    "sign": obj.sign.name,
+                    "degree": float(obj.longitude.raw),
+                    "house": obj.house.number if obj.house else None,
+                    "retrograde": getattr(obj, "retrograde", False),
                 }
-            )
+
+        for house in natal.houses.values():
+            chart_dict["houses"][f"House_{house.number}"] = {
+                "sign": house.sign.name,
+                "degree": float(house.longitude.raw),
+            }
+
+        for aspect_list in natal.aspects.values():
+            for aspect in aspect_list.values():
+                chart_dict["aspects"].append(
+                    {
+                        "planet1": aspect._active_name,
+                        "planet2": aspect._passive_name,
+                        "type": aspect.type,
+                        "angle": float(aspect.difference.degrees),
+                        "orb": float(aspect.orb),
+                    }
+                )
         return json.dumps(chart_dict, indent=2)
 
     def interpret_chart_to_personality(self, chart_json: str) -> str:
