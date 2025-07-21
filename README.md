@@ -25,6 +25,12 @@ This repository contains a minimal astrological chatbot that generates a random 
    uvicorn app:app --reload
    ```
 
+4. Use the command line interface to generate personalities or chat directly:
+   ```bash
+   python cli.py generate   # prints a personality profile
+   python cli.py chat       # start a terminal chat session
+   ```
+
 ## Development
 
 - Create a virtual environment and install dependencies from `requirements.txt`.
