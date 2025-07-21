@@ -242,6 +242,10 @@ class AstroPersonalityBot:
         return system_prompt
 
     def generate_new_personality(self) -> Tuple[str, str, Dict[str, Any]]:
+        if self.tokenizer is None or self.model is None:
+            raise RuntimeError(
+                "Language model not loaded. Install required packages and re-run."
+            )
         birth_data = self.generate_random_birth_data()
         self.current_chart_json = self.generate_chart_json(birth_data)
         chart_data = json.loads(self.current_chart_json)
@@ -269,6 +273,10 @@ class AstroPersonalityBot:
     def chat(self, message: str) -> str:
         if not self.current_personality:
             return "Please generate a personality first by clicking the button above!"
+        if self.tokenizer is None or self.model is None:
+            raise RuntimeError(
+                "Language model not loaded. Install required packages and re-run."
+            )
         chat_prompt = (
             f"<s>[INST] <<SYS>>\n{self.current_personality['system_prompt']}\n<</SYS>>\n\n{message} [/INST]"
         )

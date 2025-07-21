@@ -22,10 +22,18 @@ def main(argv: Optional[list[str]] = None) -> None:
     bot = AstroPersonalityBot()
 
     if args.command == "generate":
-        display, _json, _data = bot.generate_new_personality()
+        try:
+            display, _json, _data = bot.generate_new_personality()
+        except RuntimeError as exc:
+            print(exc)
+            return
         print(display)
     elif args.command == "chat":
-        display, _json, _data = bot.generate_new_personality()
+        try:
+            display, _json, _data = bot.generate_new_personality()
+        except RuntimeError as exc:
+            print(exc)
+            return
         print(display)
         print("\nStart chatting with the generated personality. Type 'exit' to quit.\n")
         while True:
@@ -35,7 +43,11 @@ def main(argv: Optional[list[str]] = None) -> None:
                 break
             if user_input.strip().lower() in {"exit", "quit"}:
                 break
-            response = bot.chat(user_input)
+            try:
+                response = bot.chat(user_input)
+            except RuntimeError as exc:
+                print(exc)
+                break
             print(f"Bot: {response}")
 
 
