@@ -106,7 +106,7 @@ class AstroPersonalityBot:
                 bnb_4bit_use_double_quant=True,
             )
         else:
-            logger.info("No quantization config for CPU")
+            logger.info("No quantization config for CPU - will apply dynamic quantization later")
             bnb_config = None
 
         logger.info("Loading tokenizer...")
@@ -121,6 +121,15 @@ class AstroPersonalityBot:
             device_map="auto" if self.device == "cuda" else None,
             torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
         )
+
+        if self.device == "cpu":
+            # Convert linear layers to int8 for faster CPU inference
+            logger.info("Applying dynamic int8 quantization for CPU")
+            self.model = torch.quantization.quantize_dynamic(
+                self.model, {torch.nn.Linear}, dtype=torch.qint8
+            )
+            self.model.eval()
+
         logger.info("Model loaded successfully!")
 
     def generate_random_birth_data(self) -> Dict[str, Any]:
