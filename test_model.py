@@ -54,7 +54,14 @@ def test_model():
 }
 
     # Simple test prompt
-    prompt = f"<s>[INST] You are an expert asrologer. Anaylyse this birth chart: {chart_json} [/INST]"
+    prompt = f"""<s>[INST] You are an expert asrologer. Anaylyse this birth chart: {chart_json}.  Provide a structured personality analysis covering:
+                    1. Core personality traits
+                    2. Strengths and talents
+                    3. Potential challenges
+                    4. Communication style
+                    5. Relationship patterns
+
+                    Keep the response concise but meaningful.  [/INST]"""
     
     print(f"Input prompt: {prompt}")
     print("-" * 50)
