@@ -13,15 +13,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from pandas import read_csv # type: ignore
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from immanuel import charts
 from immanuel.const import chart, calc
 from immanuel.setup import settings
-
-# Load available locations once for generating real birth places
-LOCATIONS_DF = read_csv(Path(__file__).resolve().parent / "data" / "locations.csv")
 
 
 
@@ -121,24 +117,15 @@ class AstroPersonalityBot:
             random_hour, random_minute
         )
 
-        try:
-            if LOCATIONS_DF.empty:
-                raise ValueError("Locations data is empty")
-            location = LOCATIONS_DF.sample(1).iloc[0]
-            lat = float(location["latitude"])
-            lon = float(location["longitude"])
-        except (KeyError, ValueError, IndexError) as e:
-            # Fallback to default location (New York City) if there's an issue
-            print(f"Error accessing location data: {e}. Using default location.")
-            lat, lon = 40.7128, -74.0060  # NYC coordinates
+        # Generate random coordinates (latitude: -90 to 90, longitude: -180 to 180)
+        lat = random.uniform(-90, 90)
+        lon = random.uniform(-180, 180)
 
         return {
             "date": birth_datetime.strftime("%Y-%m-%d"),
             "time": birth_datetime.strftime("%H:%M"),
             "lat": lat,
             "lon": lon,
-            "city": location["city"],
-            "country": location["country"],
         }
 
     def generate_chart_json(self, birth_data: Dict[str, Any]) -> str:
