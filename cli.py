@@ -23,32 +23,18 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     if args.command == "generate":
         try:
-            display, _json, _data = bot.generate_new_personality()
+            chart_data = bot.generate_new_personality()
         except RuntimeError as exc:
             print(exc)
             return
-        print(display)
+        print(chart_data)
     elif args.command == "chat":
         try:
-            display, _json, _data = bot.generate_new_personality()
+            data = bot.generate_new_personality()
         except RuntimeError as exc:
             print(exc)
             return
-        print(display)
-        print("\nStart chatting with the generated personality. Type 'exit' to quit.\n")
-        while True:
-            try:
-                user_input = input("You: ")
-            except (EOFError, KeyboardInterrupt):
-                break
-            if user_input.strip().lower() in {"exit", "quit"}:
-                break
-            try:
-                response = bot.chat(user_input)
-            except RuntimeError as exc:
-                print(exc)
-                break
-            print(f"Bot: {response}")
+        print(data)
 
 
 if __name__ == "__main__":  # pragma: no cover
