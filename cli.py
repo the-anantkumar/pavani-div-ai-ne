@@ -23,18 +23,10 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     if args.command == "generate":
         try:
-            chart_data = bot.generate_new_personality()
+            chart_data = bot.generate_birth_chart()
         except RuntimeError as exc:
             print(exc)
             return
-        print(chart_data)
-    elif args.command == "chat":
-        try:
-            data = bot.generate_new_personality()
-        except RuntimeError as exc:
-            print(exc)
-            return
-        print(data)
 
 
 if __name__ == "__main__":  # pragma: no cover

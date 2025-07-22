@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd # type: ignore
+from pandas import read_csv # type: ignore
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from immanuel import charts
@@ -21,7 +21,7 @@ from immanuel.const import chart, calc
 from immanuel.setup import settings
 
 # Load available locations once for generating real birth places
-LOCATIONS_DF = pd.read_csv(Path(__file__).resolve().parent / "data" / "locations.csv")
+LOCATIONS_DF = read_csv(Path(__file__).resolve().parent / "data" / "locations.csv")
 
 
 
@@ -31,11 +31,20 @@ class AstroPersonalityBot:
     def __init__(self, model_name: str = "mistralai/Mistral-7B-Instruct-v0.1"):
         self._setup_immanuel()
         self.model_name = model_name
-        self.device = "cuda" if torch and hasattr(torch, "cuda") and torch.cuda.is_available() else "cpu"
+        # Check for CUDA availability once
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         try:
             self._setup_llm()
-        except Exception as exc:  # pragma: no cover - optional during tests
-            print(f"LLM setup skipped: {exc}")
+        except ImportError as exc:
+            print(f"LLM setup skipped: Required module not available - {exc}")
+            self.tokenizer = None
+            self.model = None
+        except RuntimeError as exc:
+            print(f"LLM setup skipped: Runtime error - {exc}")
+            self.tokenizer = None
+            self.model = None
+        except Exception as exc:
+            print(f"LLM setup skipped: Unexpected error - {exc.__class__.__name__}: {exc}")
             self.tokenizer = None
             self.model = None
         self.current_chart_json: Optional[str] = None
@@ -98,18 +107,30 @@ class AstroPersonalityBot:
         print("Model loaded successfully!")
 
     def generate_random_birth_data(self) -> Dict[str, Any]:
+        # Generate a random date between 1950 and 2005
         start_date = datetime(1950, 1, 1)
         end_date = datetime(2005, 12, 31)
         random_days = random.randint(0, (end_date - start_date).days)
         birth_date = start_date + timedelta(days=random_days)
-        birth_datetime = (
-            datetime.combine(birth_date.date(), datetime.min.time())
-            + timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59))
+        
+        # Add random hour and minute
+        random_hour = random.randint(0, 23)
+        random_minute = random.randint(0, 59)
+        birth_datetime = datetime(
+            birth_date.year, birth_date.month, birth_date.day,
+            random_hour, random_minute
         )
 
-        location = LOCATIONS_DF.sample(1).iloc[0]
-        lat = float(location["latitude"])
-        lon = float(location["longitude"])
+        try:
+            if LOCATIONS_DF.empty:
+                raise ValueError("Locations data is empty")
+            location = LOCATIONS_DF.sample(1).iloc[0]
+            lat = float(location["latitude"])
+            lon = float(location["longitude"])
+        except (KeyError, ValueError, IndexError) as e:
+            # Fallback to default location (New York City) if there's an issue
+            print(f"Error accessing location data: {e}. Using default location.")
+            lat, lon = 40.7128, -74.0060  # NYC coordinates
 
         return {
             "date": birth_datetime.strftime("%Y-%m-%d"),
@@ -160,27 +181,34 @@ class AstroPersonalityBot:
                 "degree": float(house.longitude.raw),
             }
 
-        for aspect_list in natal.aspects.values():
-            for aspect in aspect_list.values():
-                chart_dict["aspects"].append(
-                    {
-                        "planet1": aspect._active_name,
-                        "planet2": aspect._passive_name,
-                        "type": aspect.type,
-                        "angle": float(aspect.difference.degrees),
-                        "orb": float(aspect.orb),
-                    }
-                )
+        # Process aspects more efficiently with a list comprehension
+        chart_dict["aspects"] = [
+            {
+                "planet1": aspect._active_name,
+                "planet2": aspect._passive_name,
+                "type": aspect.type,
+                "angle": float(aspect.difference.degrees),
+                "orb": float(aspect.orb),
+            }
+            for aspect_list in natal.aspects.values()
+            for aspect in aspect_list.values()
+        ]
         return json.dumps(chart_dict, indent=2)
 
-    def generate_new_personality(self) -> Tuple[str, str, Dict[str, Any]]:
+    def generate_birth_chart(self) -> Dict[str, Any]:
         if self.tokenizer is None or self.model is None:
             raise RuntimeError(
                 "Language model not loaded. Install required packages and re-run."
             )
         birth_data = self.generate_random_birth_data()
         self.current_chart_json = self.generate_chart_json(birth_data)
-        chart_data = json.loads(self.current_chart_json)
+        try:
+            chart_data = json.loads(self.current_chart_json)
+        except json.JSONDecodeError as e:
+            print(f"Error parsing chart JSON: {e}")
+            # Return empty dict as fallback if JSON parsing fails
+            chart_data = {"error": "Failed to parse chart data", "raw": self.current_chart_json[:100] + '...'}
+            self.current_chart_json = json.dumps(chart_data)
         print(chart_data)
         return chart_data
 
