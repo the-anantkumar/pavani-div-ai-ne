@@ -13,31 +13,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
-
-try:  # Optional imports for test environments
-    import gradio as gr
-except Exception:  # pragma: no cover - optional dependency
-    gr = None
-try:
-    import torch
-except Exception:  # pragma: no cover - optional dependency
-    torch = None
-try:
-    from fastapi import FastAPI, HTTPException
-    from pydantic import BaseModel
-except Exception:  # pragma: no cover - optional dependency
-    FastAPI = HTTPException = BaseModel = None
-try:
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-except Exception:  # pragma: no cover - optional dependency
-    AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = None
-try:
-    from immanuel import charts
-    from immanuel.const import chart, calc
-    from immanuel.setup import settings
-except Exception:  # pragma: no cover - optional dependency
-    charts = chart = calc = settings = None
+import pandas as pd # type: ignore
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from immanuel import charts
+from immanuel.const import chart, calc
+from immanuel.setup import settings
 
 # Load available locations once for generating real birth places
 LOCATIONS_DF = pd.read_csv(Path(__file__).resolve().parent / "data" / "locations.csv")
