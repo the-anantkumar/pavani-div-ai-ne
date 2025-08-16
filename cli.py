@@ -16,9 +16,15 @@ def main(argv: Optional[list[str]] = None) -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser(
+    generate_parser = subparsers.add_parser(
         "generate", help="Generate a new personality profile and exit"
     )
+    generate_parser.add_argument(
+        "--sample", 
+        action="store_true", 
+        help="Use sample birth data instead of random"
+    )
+    
     subparsers.add_parser(
         "chat", help="Generate a personality and start a chat session"
     )
@@ -33,14 +39,23 @@ def main(argv: Optional[list[str]] = None) -> None:
     if args.command == "generate":
         logger.info("Starting generate command...")
         try:
-            chart_data = bot.generate_birth_chart()
+            if args.sample:
+                # Use hardcoded sample birth data for testing
+                birth_data = bot.get_sample_birth_data()
+                logger.info("Using sample birth data: %s", birth_data)
+            else:
+                # Use random birth data
+                birth_data = None
+                logger.info("Using random birth data")
+            
+            chart_data = bot.generate_birth_chart(birth_data)
             logger.info("Generate command completed successfully")
         except RuntimeError as exc:
-            logger.error(f"Runtime error: {exc}")
+            logger.error("Runtime error: %s", exc)
             print(exc)
             return
         except Exception as exc:
-            logger.error(f"Unexpected error: {exc.__class__.__name__}: {exc}")
+            logger.error("Unexpected error: %s: %s", exc.__class__.__name__, exc)
             print(f"Error: {exc}")
             return
 
